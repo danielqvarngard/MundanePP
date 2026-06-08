@@ -37,6 +37,13 @@ template <std::size_t N> struct MagicGadget {
   return normalized;
 }
 
+template <std::size_t N>
+[[nodiscard]] MagicGadget<N>
+make_magic_gadget(Pauli<N> p, double theta, int location = -1,
+                  int source_gate = -1) {
+  return MagicGadget<N>{p, normalize_angle(theta), location, source_gate};
+}
+
 // Returns the shortest angular distance to any integer multiple of pi / 2.
 [[nodiscard]] inline double
 distance_to_clifford_angle(double theta) noexcept {
@@ -53,6 +60,11 @@ distance_to_clifford_angle(double theta) noexcept {
 }
 
 namespace detail {
+
+template <std::size_t N>
+void flip_theta_sign(MagicGadget<N> &gadget) noexcept {
+  gadget.theta = normalize_angle(-gadget.theta);
+}
 
 template <std::size_t N>
 void set_local_pauli(Pauli<N> &pauli, std::size_t qubit, bool x, bool z) {
@@ -83,7 +95,7 @@ void apply_h(MagicGadget<N> &gadget, std::size_t qubit) {
   const bool z = gadget.p.has_z(qubit);
 
   if (x && z) {
-    gadget.theta = -gadget.theta;
+    detail::flip_theta_sign(gadget);
   }
   detail::set_local_pauli(gadget.p, qubit, z, x);
 }
@@ -94,7 +106,7 @@ void apply_s(MagicGadget<N> &gadget, std::size_t qubit) {
   const bool z = gadget.p.has_z(qubit);
 
   if (x && z) {
-    gadget.theta = -gadget.theta;
+    detail::flip_theta_sign(gadget);
   }
   detail::set_local_pauli(gadget.p, qubit, x, z ^ x);
 }
@@ -105,7 +117,7 @@ void apply_sdg(MagicGadget<N> &gadget, std::size_t qubit) {
   const bool z = gadget.p.has_z(qubit);
 
   if (x && !z) {
-    gadget.theta = -gadget.theta;
+    detail::flip_theta_sign(gadget);
   }
   detail::set_local_pauli(gadget.p, qubit, x, z ^ x);
 }
@@ -113,21 +125,21 @@ void apply_sdg(MagicGadget<N> &gadget, std::size_t qubit) {
 template <std::size_t N>
 void apply_x(MagicGadget<N> &gadget, std::size_t qubit) {
   if (gadget.p.has_z(qubit)) {
-    gadget.theta = -gadget.theta;
+    detail::flip_theta_sign(gadget);
   }
 }
 
 template <std::size_t N>
 void apply_y(MagicGadget<N> &gadget, std::size_t qubit) {
   if (gadget.p.has_x(qubit) != gadget.p.has_z(qubit)) {
-    gadget.theta = -gadget.theta;
+    detail::flip_theta_sign(gadget);
   }
 }
 
 template <std::size_t N>
 void apply_z(MagicGadget<N> &gadget, std::size_t qubit) {
   if (gadget.p.has_x(qubit)) {
-    gadget.theta = -gadget.theta;
+    detail::flip_theta_sign(gadget);
   }
 }
 
@@ -141,8 +153,8 @@ void apply_cx(MagicGadget<N> &gadget, std::size_t control,
   const bool x_t = gadget.p.has_x(target);
   const bool z_t = gadget.p.has_z(target);
 
-  if (x_c && z_t && (x_t ^ z_c ^ true)) {
-    gadget.theta = -gadget.theta;
+  if (x_c && z_t && (x_t == z_c)) {
+    detail::flip_theta_sign(gadget);
   }
   if (x_c) {
     gadget.p.flip_x(target);
@@ -162,7 +174,7 @@ void apply_cz(MagicGadget<N> &gadget, std::size_t a, std::size_t b) {
   const bool z_b = gadget.p.has_z(b);
 
   if (x_a && x_b && (z_a ^ z_b)) {
-    gadget.theta = -gadget.theta;
+    detail::flip_theta_sign(gadget);
   }
   if (x_b) {
     gadget.p.flip_z(a);
@@ -174,6 +186,7 @@ void apply_cz(MagicGadget<N> &gadget, std::size_t a, std::size_t b) {
 
 template <std::size_t N>
 void apply_swap(MagicGadget<N> &gadget, std::size_t a, std::size_t b) {
+  detail::check_distinct_qubits(a, b, "SWAP");
   gadget.p.swap_qubits(a, b);
 }
 

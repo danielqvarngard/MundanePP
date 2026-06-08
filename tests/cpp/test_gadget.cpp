@@ -61,6 +61,19 @@ void test_angle_utilities() {
          "tight tolerance rejects nearby multiple");
 }
 
+void test_gadget_construction() {
+  magic_reduce::Pauli<2> pauli;
+  pauli.set_y(1);
+
+  const auto gadget =
+      magic_reduce::make_magic_gadget(pauli, 5.0 * pi, 7, 11);
+
+  expect_gadget(gadget, "IY", pi,
+                "make_magic_gadget normalizes a large angle");
+  expect(gadget.location == 7 && gadget.source_gate == 11,
+         "make_magic_gadget preserves metadata");
+}
+
 void test_h_conjugation() {
   magic_reduce::MagicGadget<1> x;
   x.p.set_x(0);
@@ -79,6 +92,13 @@ void test_h_conjugation() {
   y.theta = theta;
   magic_reduce::apply_h(y, 0);
   expect_gadget(y, "Y", -theta, "H Y H = -Y");
+
+  magic_reduce::MagicGadget<1> y_at_pi;
+  y_at_pi.p.set_y(0);
+  y_at_pi.theta = pi;
+  magic_reduce::apply_h(y_at_pi, 0);
+  expect_gadget(y_at_pi, "Y", pi,
+                "sign-flipped pi remains canonical positive pi");
 }
 
 void test_s_conjugation() {
@@ -251,6 +271,14 @@ void test_swap_conjugation() {
                 "SWAP exchanges labels without changing sign");
   expect(gadget.location == 7 && gadget.source_gate == 11,
          "conjugation preserves gadget metadata");
+
+  bool threw = false;
+  try {
+    magic_reduce::apply_swap(gadget, 0, 0);
+  } catch (const std::invalid_argument &) {
+    threw = true;
+  }
+  expect(threw, "SWAP rejects identical qubits");
 }
 
 } // namespace
@@ -258,6 +286,7 @@ void test_swap_conjugation() {
 int main() {
   try {
     test_angle_utilities();
+    test_gadget_construction();
     test_h_conjugation();
     test_s_conjugation();
     test_pauli_conjugation();
